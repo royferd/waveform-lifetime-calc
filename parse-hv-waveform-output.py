@@ -14,6 +14,8 @@ from datetime import datetime
 from datetime import timedelta
 import math
 from scipy.optimize import curve_fit
+import glob, os
+
 
 def func(x,c,a,tau):
     return c + a*np.exp(-x/tau)
@@ -73,53 +75,65 @@ def parse_wv_file(filename,voltage_scale):
 def main():
     
     file = '2018-11-01-172402-waveform-output-1.txt'
+    os.chdir("./")
+    file_ = []
+    for string in glob.glob("*output-1.txt"):
+            file_ = np.append(file_,string)
+    print(file_)
     waveform_scale = 200.0/(-10.0) # assumes 200 nA fixed range, gives units of nA
     voltage_scale = 30.0/10.0 # assumes Applied Kilovolts 30 kV power supply, gives units of kV
     
-    dt,dt_trim,waveform,waveform_trim,voltage_setting,timestamp = parse_wv_file(file,voltage_scale)
-    
-    date = str(timestamp)
-    date = date.replace(" ","-")
-    date = date.replace(":","")
-    partdate = date.partition(".")
-    date = partdate[0]
-    
-    save_image_fn = date + '.png'
-   
-    popt, pcov  = curve_fit(func,dt_trim,waveform_trim)
-    
-    print('timestamp: ', date)
-    print('high voltage sign and magnitude: %.1f kV' %voltage_setting)
-    print('fitted offset: %.6f nA' %popt[0])
-    print('fitted amplitude: %.6f nA' %popt[1])
-    print('fitted lifetime: %.6f s' %popt[2])
-    print('covariance matrix:')
-    print(pcov)
-    print('')
-    
-    number_fit_points = 100
-    dt_avg_step= (np.max(dt_trim)-np.min(dt_trim))/float(number_fit_points)
-    dt_fit = []
-    dt_fit = np.append(dt_fit,dt_trim[0])
-    
-    for i in range(1,number_fit_points):
-        dt_fit = np.append(dt_fit,dt_fit[i-1]+dt_avg_step)
+    for i in range(len(file_)):
         
+        dt,dt_trim,waveform,waveform_trim,voltage_setting,timestamp = parse_wv_file(file_[i],voltage_scale)
     
-    offset = str(popt[0]*waveform_scale)
-    amplitude = str(popt[1]*waveform_scale)
-    lifetime = str(popt[2])
-    date = str(date)
-    voltage_string = str(voltage_setting)
-    
-    f = open('waveform-parameters.txt',"a")
-    f.write(date + "\t" + voltage_string + "\t" + offset + "\t" + amplitude + "\t" + lifetime + "\n")
-    f.close()
-    
-    plt.scatter(dt,np.multiply(waveform,waveform_scale),facecolors='none')
-    plt.plot(dt_fit,np.multiply(func(dt_fit,*popt),waveform_scale),'r-')
-    plt.savefig(save_image_fn)
-    #plt.show()
+        popt, pcov  = curve_fit(func,dt_trim,waveform_trim)
+        
+        date = str(timestamp)
+        date = date.replace(" ","-")
+        date = date.replace(":","")
+        partdate = date.partition(".")
+        date = partdate[0]
+        
+        save_image_fn = date + '.png'
+           
+        print('timestamp: ', date)
+        print('high voltage sign and magnitude: %.1f kV' %voltage_setting)
+        print('fitted offset: %.6f nA' %popt[0])
+        print('fitted amplitude: %.6f nA' %popt[1])
+        print('fitted lifetime: %.6f s' %popt[2])
+        print('covariance matrix:')
+        print(pcov)
+        print('')
+        
+        number_fit_points = 100
+        dt_avg_step= (np.max(dt_trim)-np.min(dt_trim))/float(number_fit_points)
+        dt_fit = []
+        dt_fit = np.append(dt_fit,dt_trim[0])
+        
+        for i in range(1,number_fit_points):
+            dt_fit = np.append(dt_fit,dt_fit[i-1]+dt_avg_step)
+            
+        
+        offset = str(popt[0]*waveform_scale)
+        amplitude = str(popt[1]*waveform_scale)
+        lifetime = str(popt[2])
+        date = str(date)
+        voltage_string = str(voltage_setting)
+        
+        f = open('waveform-parameters.txt',"a")
+        f.write(date + "\t" + voltage_string + "\t" + offset + "\t" + amplitude + "\t" + lifetime + "\n")
+        f.close()
+        
+        plt.figure(figsize=[9.0,6.0])
+        plt.scatter(dt,np.multiply(waveform,waveform_scale),facecolors='none',edgecolor="black")
+        plt.plot(dt_fit,np.multiply(func(dt_fit,*popt),waveform_scale),'r-')
+        plt.xlabel('time (s)')
+        plt.ylabel('picoammeter current (nA)')
+        plt.title(date + ' @ %.1f kV' %voltage_setting)
+        plt.savefig(save_image_fn)
+        #plt.show()
+        plt.close()
     
 if __name__ == "__main__":
     main()
