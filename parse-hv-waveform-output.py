@@ -96,7 +96,8 @@ def main():
         date = partdate[0]
         
         save_image_fn = date + '.png'
-           
+        save_image_res_fn = date + '-res.png'
+        
         print('timestamp: ', date)
         print('high voltage sign and magnitude: %.1f kV' %voltage_setting)
         print('fitted offset: %.6f nA' %popt[0])
@@ -114,24 +115,59 @@ def main():
         for i in range(1,number_fit_points):
             dt_fit = np.append(dt_fit,dt_fit[i-1]+dt_avg_step)
             
+        residual = []
+        for i in range(0,len(dt_trim)):
+            residual = np.append(residual, np.multiply(waveform_trim[i] - func(dt_trim[i],*popt),waveform_scale))
+            
+        zero_y = [0.0, 0.0]
+        zero_x = [dt_trim[0], dt_trim[len(dt_trim)-1]]
+            
         
         offset = str(popt[0]*waveform_scale)
+        offset_err = str(abs(np.sqrt(pcov[0][0])*waveform_scale))
         amplitude = str(popt[1]*waveform_scale)
+        amplitude_err= str(abs(np.sqrt(pcov[1][1])*waveform_scale))
         lifetime = str(popt[2])
+        lifetime_err = str(abs(np.sqrt(pcov[2][2])))
         date = str(date)
         voltage_string = str(voltage_setting)
         
         f = open('waveform-parameters.txt',"a")
-        f.write(date + "\t" + voltage_string + "\t" + offset + "\t" + amplitude + "\t" + lifetime + "\n")
+        f.write(date + "\t" + voltage_string + "\t" + offset + "\t" + offset_err + "\t" + amplitude_err + "\t" + lifetime + "\t" + lifetime_err + "\n")
         f.close()
+
+        font = {'family' : 'normal',
+        'weight' : 'bold',
+        'size'   : 22}
+
+        plt.rc('font', **font)
+
+        plt.rc('text', usetex=True)         
+        eqn_str = r'$I_{\mathrm{ramp}} = (%.2f \pm  %.2f)  + (%.2f \pm %.2f) \mathrm{exp}\left(\frac{-t }{ %.3f \pm %.3f}\right)$' %(float(offset),float(offset_err),float(amplitude),float(amplitude_err),float(lifetime),float(lifetime_err))
+        eqn_res_str = r'$I_{\mathrm{raw}} - \left[%.2f \pm  %.2f)  + (%.2f \pm %.2f) \mathrm{exp}\left(\frac{-t }{ %.3f \pm %.3f}\right)\right]$' %(float(offset),float(offset_err),float(amplitude),float(amplitude_err),float(lifetime),float(lifetime_err))
         
-        plt.figure(figsize=[9.0,6.0])
+
+        plt.figure(figsize=[12.0,8.0])
         plt.scatter(dt,np.multiply(waveform,waveform_scale),facecolors='none',edgecolor="black")
         plt.plot(dt_fit,np.multiply(func(dt_fit,*popt),waveform_scale),'r-')
+        ax = plt.gca
         plt.xlabel('time (s)')
         plt.ylabel('picoammeter current (nA)')
         plt.title(date + ' @ %.1f kV' %voltage_setting)
+        plt.annotate(eqn_str,xy=(0.225,0.5),xycoords='axes fraction' )
         plt.savefig(save_image_fn)
+        #plt.show()
+        plt.close()
+
+        plt.figure(figsize=[12.0,8.0])
+        plt.plot(zero_x,zero_y,'b--')
+        plt.scatter(dt_trim,residual,facecolors='none',edgecolor="black")
+        ax = plt.gca
+        plt.xlabel('time (s)')
+        plt.ylabel('picoammeter current (nA)')
+        plt.title(date + ' @ %.1f kV residuals' %voltage_setting)
+        plt.annotate(eqn_res_str,xy=(0.2,0.9),xycoords='axes fraction' )
+        plt.savefig(save_image_res_fn)
         #plt.show()
         plt.close()
     
